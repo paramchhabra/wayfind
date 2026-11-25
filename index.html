@@ -47,6 +47,7 @@ h2{margin:0 0 12px;font-size:19px}
 @keyframes pop{0%{transform:scale(.6);opacity:0}50%{transform:scale(1.25);opacity:1}100%{transform:scale(1)}}
 .pill.low{color:#ff5d5d;animation:pulse .8s infinite}
 @keyframes pulse{50%{transform:scale(1.12)}}
+select{font:inherit;width:100%;padding:11px 13px;margin:6px 0 12px;border-radius:10px;border:1px solid var(--b);background:#0e1116;color:var(--t)}
 .cf{position:fixed;top:-16px;width:9px;height:14px;z-index:20;pointer-events:none;animation:fall 2.8s linear forwards}
 @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
 @media(max-width:560px){.cols{grid-template-columns:1fr}}
@@ -63,6 +64,8 @@ h2{margin:0 0 12px;font-size:19px}
 <select id="lvl" style="width:100%;font:inherit;padding:11px 13px;margin:6px 0 12px;border-radius:10px;border:1px solid var(--b);background:#0e1116;color:var(--t)">
 <option value="0">Rookie</option><option value="1">Amateur</option><option value="2" selected>Intermediate</option><option value="3">Advanced</option><option value="4">Expert</option>
 </select></label>
+<label>Location difficulty
+<select id="gd"><option value="easy">Easy: near famous places</option><option value="medium" selected>Medium: city streets</option><option value="hard">Hard: anywhere</option></select></label>
 <button id="botgo" class="g" style="width:100%">Play vs bot</button>
 <p id="err" class="m"></p>
 </div></div>
@@ -72,6 +75,7 @@ h2{margin:0 0 12px;font-size:19px}
 <p class="m" id="lnote">Pick a team. Up to 5 per team; a team can be just one player (1v1). The first person in the room is the host.</p>
 <div class="cols" id="teams"></div>
 <div id="idle" class="m"></div>
+<div style="margin:2px 0 12px"><span class="m">Locations:</span> <select id="diff" style="width:auto;display:inline-block;margin:0 0 0 6px;padding:6px 10px"><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select><span id="dtxt" class="pill" style="display:none"></span></div>
 <button id="start" disabled>Start game</button>
 <span id="swait" class="m"></span>
 </div></div>
@@ -104,6 +108,9 @@ const CFG={
 const ROUNDS=5,TIME=120,MAX=5,HP=5000,DMG=1; /* DMG = damage multiplier on the score gap */
 const TEAMS={A:{n:"Team Blue",c:"#4c9aff"},B:{n:"Team Coral",c:"#ff7a59"}};
 const SEEDS=[[48.86,2.35],[51.5,-0.12],[41.9,12.5],[40.4,-3.7],[52.5,13.4],[59.3,18.07],[52.2,21],[37.98,23.7],[41,28.97],[35.68,139.7],[34.7,135.5],[37.57,127],[13.75,100.5],[-6.2,106.8],[25.2,55.27],[-26.2,28],[-1.29,36.8],[-33.9,18.4],[-33.87,151.2],[-37.8,144.96],[-36.85,174.76],[40.7,-74],[41.88,-87.6],[34,-118.2],[19.4,-99.1],[4.7,-74.07],[-23.55,-46.6],[-34.6,-58.4],[-33.45,-70.67],[-12.05,-77.04],[43.65,-79.38],[49.28,-123.1],[64.15,-21.9],[59.9,10.75],[60.17,24.94],[1.35,103.8],[3.14,101.7],[25.03,121.5],[47.9,106.9],[41.7,44.8],[44.43,26.1],[38.7,-9.14],[53.35,-6.26]];
+const LANDMARKS=[[48.8584,2.2945],[48.8606,2.3376],[48.8738,2.295],[51.5007,-0.1246],[51.5055,-0.0754],[51.5014,-0.1419],[41.8902,12.4922],[41.9009,12.4833],[41.9022,12.4539],[41.4036,2.1744],[52.5163,13.3777],[37.9715,23.7267],[41.0086,28.9802],[40.758,-73.9855],[40.7061,-73.9969],[40.7484,-73.9857],[37.8199,-122.4783],[34.1016,-118.3267],[36.1147,-115.1728],[38.8977,-77.0365],[38.8893,-77.0502],[43.6426,-79.3871],[-33.8568,151.2153],[-33.8523,151.2108],[-22.9711,-43.1822],[-34.6083,-58.3712],[19.4326,-99.1332],[35.6586,139.7454],[35.6595,139.7005],[35.7148,139.7967],[37.5796,126.977],[1.2834,103.8607],[3.1579,101.7116],[-33.9036,18.4217],[25.1972,55.2744],[25.034,121.5645],[13.75,100.4913],[48.1845,16.3122],[50.0865,14.4114],[52.3732,4.8936],[59.325,18.071],[55.6803,12.5906],[38.6916,-9.216],[53.3455,-6.2641],[64.1417,-21.9266],[18.922,72.8347],[28.6129,77.2295],[17.3616,78.4747]];
+/* list = seed points; j = random spread in degrees (total); r = Street View search radius in metres */
+const DIFF={easy:{list:LANDMARKS,j:0.006,r:600},medium:{list:SEEDS,j:0.04,r:3000},hard:{list:SEEDS,j:1.2,r:100000}};
 const DARK=[{elementType:"geometry",stylers:[{color:"#1b2230"}]},{elementType:"labels.text.fill",stylers:[{color:"#8b949e"}]},{elementType:"labels.text.stroke",stylers:[{color:"#0e1116"}]},{featureType:"water",elementType:"geometry",stylers:[{color:"#0b1220"}]},{featureType:"road",elementType:"geometry",stylers:[{color:"#2a313c"}]},{featureType:"poi",stylers:[{visibility:"off"}]},{featureType:"transit",stylers:[{visibility:"off"}]},{featureType:"administrative.country",elementType:"geometry.stroke",stylers:[{color:"#6b7686"}]},{featureType:"administrative.province",elementType:"geometry.stroke",stylers:[{color:"#3d4654"}]},{featureType:"administrative.locality",elementType:"labels.text.fill",stylers:[{color:"#c3ccd8"}]}];
 
 const $=id=>document.getElementById(id);
@@ -176,7 +183,8 @@ $("botgo").onclick=()=>{
   if(!mapsReady){$("err").textContent="Maps is still loading. Try again in a moment.";return;}
   me.team="A";
   joinRoom(n,"bot"+Math.random().toString(36).slice(2,8),{lvl:+$("lvl").value});
-  startGame();
+  ref.child("diff").set($("gd").value);
+  startGame($("gd").value);
 };
 function setTeam(t){
   if(players().filter(p=>p.team===t).length>=MAX)return;
@@ -194,6 +202,7 @@ function render(){
 
 function lobbyView(g,P){
   show("lobby");const live=g.status==="lobby";
+  const dv=S.diff||"medium";$("diff").value=dv;$("diff").style.display=isHost()&&live?"":"none";$("dtxt").style.display=isHost()&&live?"none":"";$("dtxt").textContent=dv[0].toUpperCase()+dv.slice(1);
   $("lnote").textContent=live?"Pick a team. Up to 5 per team; a team can be just one player (1v1). The first person in the room is the host. Each team starts with 5,000 health. Each round the team with the worse closest pin loses the score gap. Lowest health after 5 rounds loses, and 0 ends it early.":"A game is in progress. Wait for the next one.";
   $("teams").innerHTML=["A","B"].map(t=>{
     const m=P.filter(p=>p.team===t);
@@ -208,21 +217,22 @@ function lobbyView(g,P){
   $("start").disabled=!(ok&&mapsReady);
   $("swait").textContent=isHost()?(ok?"":"Each team needs at least one player."):"Waiting for the host to start.";
 }
-async function startGame(){
+async function startGame(d){
   $("start").disabled=true;$("swait").textContent="Finding locations…";
-  const locs=[],pool=SEEDS.slice().sort(()=>Math.random()-.5);
+  const diff=(typeof d==="string"&&d)||S.diff||"medium",cf=DIFF[diff]||DIFF.medium,locs=[],pool=cf.list.slice().sort(()=>Math.random()-.5);
   for(const s of pool){
     if(locs.length>=ROUNDS)break;
     try{
-      const r=await sv.getPanorama({location:{lat:s[0]+(Math.random()-.5)*1.2,lng:s[1]+(Math.random()-.5)*1.2},radius:100000,preference:google.maps.StreetViewPreference.NEAREST,sources:[google.maps.StreetViewSource.GOOGLE]});
+      const r=await sv.getPanorama({location:{lat:s[0]+(Math.random()-.5)*cf.j,lng:s[1]+(Math.random()-.5)*cf.j},radius:cf.r,preference:google.maps.StreetViewPreference.NEAREST,sources:[google.maps.StreetViewSource.GOOGLE]});
       if(!r.data.links||!r.data.links.length||!/Google/i.test(r.data.copyright||""))continue;const l=r.data.location;locs.push({p:l.pano,lat:l.latLng.lat(),lng:l.latLng.lng()});
     }catch(e){}
   }
   if(locs.length<ROUNDS){$("swait").textContent="Couldn't load Street View. Check your Maps API key.";$("start").disabled=false;return;}
   await ref.child("guesses").remove();
-  ref.child("game").set({id:Math.random().toString(36).slice(2),status:"play",round:0,locs,start:firebase.database.ServerValue.TIMESTAMP});
+  ref.child("game").set({id:Math.random().toString(36).slice(2),status:"play",round:0,diff,locs,start:firebase.database.ServerValue.TIMESTAMP});
 }
-$("start").onclick=startGame;
+$("start").onclick=()=>startGame();
+$("diff").onchange=()=>ref.child("diff").set($("diff").value);
 
 function playView(g,P){
   show("game");
@@ -243,7 +253,7 @@ function playView(g,P){
     gmap.setCenter({lat:20,lng:0});gmap.setZoom(1);$("gp").classList.remove("big");
     $("gb").disabled=true;$("gb").textContent="Place your pin";
   }
-  $("hr").textContent="Round "+(g.round+1)+" / "+ROUNDS;
+  $("hr").textContent="Round "+(g.round+1)+" / "+ROUNDS+(g.diff?" · "+g.diff[0].toUpperCase()+g.diff.slice(1):"");
   const T=P.filter(p=>p.team),done=T.filter(p=>gs(g.round,p.id)).length;
   $("hg").textContent="Guessed "+done+" / "+T.length;
   $("hp").textContent=TEAMS.A.n.split(" ")[1]+" "+fs(hp("A",g.round-1))+" · "+TEAMS.B.n.split(" ")[1]+" "+fs(hp("B",g.round-1));
