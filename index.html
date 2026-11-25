@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wayfind</title>
+<style>
+:root{--bg:#0e1116;--p:#161b22;--b:#2a313c;--t:#e6edf3;--m:#8b949e;--a:#3fb68b;--A:#4c9aff;--B:#ff7a59}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--t);font:15px system-ui,sans-serif}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:11px 18px;background:var(--a);color:#06231a;font-weight:600}
+button.g{background:#1d242e;color:var(--t);border:1px solid var(--b)}
+button:disabled{opacity:.4;cursor:default}
+input{font:inherit;width:100%;padding:11px 13px;margin:6px 0 12px;border-radius:10px;border:1px solid var(--b);background:#0e1116;color:var(--t)}
+.screen{display:none;min-height:100%;align-items:center;justify-content:center;padding:18px}
+.screen.on{display:flex}
+.card{background:var(--p);border:1px solid var(--b);border-radius:16px;padding:24px;width:100%;max-width:640px}
+h1{margin:0 0 4px;font-size:26px;display:flex;gap:10px;align-items:center}
+h2{margin:0 0 12px;font-size:19px}
+.m{color:var(--m)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.col{border:1px solid var(--b);border-radius:12px;padding:12px;background:#12171e}
+.col h3{margin:0 0 8px;font-size:15px}
+.row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid #1f262f}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;background:#1d242e;border:1px solid var(--b);font-size:13px}
+#game{padding:0;display:none;position:relative;height:100%}
+#game.on{display:block}
+#pano{position:absolute;inset:0}
+.hud{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:5}
+.hud .pill{background:rgba(14,17,22,.88);font-size:14px;padding:6px 13px}
+#gp{position:absolute;right:12px;bottom:12px;width:300px;z-index:5;background:rgba(14,17,22,.92);border:1px solid var(--b);border-radius:14px;padding:8px;transition:width .15s,opacity .15s;opacity:.88}
+#gp:hover,#gp.big{width:min(760px,calc(100vw - 24px));opacity:1}
+#gmap{height:190px;border-radius:9px;transition:height .15s}
+#gp:hover #gmap,#gp.big #gmap{height:min(520px,60vh)}
+#gp button{width:100%;margin-top:8px}
+#rmap{height:300px;border-radius:12px;margin:12px 0}
+.win{font-size:20px;font-weight:700;margin:8px 0}
+.bar{height:14px;border-radius:8px;background:#1d242e;overflow:hidden;position:relative;margin:2px 0 10px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;transition:width 1.3s cubic-bezier(.2,.8,.2,1)}
+.bar i.gh{background:#ffd166;transition-delay:.6s}
+.col{position:relative}
+.dmg{position:absolute;right:14px;top:10px;font-weight:800;font-size:28px;color:#ff5d5d;opacity:0;pointer-events:none}
+.dmg.go{animation:fl 1.8s ease-out forwards}
+@keyframes fl{0%{opacity:0;transform:translateY(10px) scale(.5)}15%{opacity:1;transform:translateY(0) scale(1.3)}100%{opacity:0;transform:translateY(-40px) scale(1)}}
+.hit{animation:shake .55s .15s,flash .9s .15s}
+@keyframes shake{0%,100%{transform:none}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+@keyframes flash{0%{background:#4a1a20}100%{background:#12171e}}
+.pop{animation:pop .7s}
+@keyframes pop{0%{transform:scale(.6);opacity:0}50%{transform:scale(1.25);opacity:1}100%{transform:scale(1)}}
+.pill.low{color:#ff5d5d;animation:pulse .8s infinite}
+@keyframes pulse{50%{transform:scale(1.12)}}
+.cf{position:fixed;top:-16px;width:9px;height:14px;z-index:20;pointer-events:none;animation:fall 2.8s linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media(max-width:560px){.cols{grid-template-columns:1fr}}
+</style></head><body>
+
+<div id="join" class="screen on"><div class="card" style="max-width:420px">
+<h1><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3fb68b" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 6l3 6-3 6-3-6z" fill="#3fb68b"/></svg>Wayfind</h1>
+<p class="m">Drop in anywhere. Guess where you are.</p>
+<label>Username<input id="nm" maxlength="16" placeholder="Your name"></label>
+<label>Room code<input id="rc" maxlength="16" placeholder="Make one up and share it"></label>
+<button id="enter" style="width:100%">Enter</button>
+<hr style="border:0;border-top:1px solid var(--b);margin:18px 0">
+<label>Or play solo against a bot
+<select id="lvl" style="width:100%;font:inherit;padding:11px 13px;margin:6px 0 12px;border-radius:10px;border:1px solid var(--b);background:#0e1116;color:var(--t)">
+<option value="0">Rookie</option><option value="1">Amateur</option><option value="2" selected>Intermediate</option><option value="3">Advanced</option><option value="4">Expert</option>
+</select></label>
+<button id="botgo" class="g" style="width:100%">Play vs bot</button>
+<p id="err" class="m"></p>
+</div></div>
+
+<div id="lobby" class="screen"><div class="card">
+<h2>Room <span class="pill" id="code"></span></h2>
+<p class="m" id="lnote">Pick a team. Up to 5 per team; a team can be just one player (1v1). The first person in the room is the host.</p>
+<div class="cols" id="teams"></div>
+<div id="idle" class="m"></div>
+<button id="start" disabled>Start game</button>
+<span id="swait" class="m"></span>
+</div></div>
+
+<div id="game">
+<div id="pano"></div>
+<div class="hud"><span class="pill" id="hr"></span><span class="pill" id="ht"></span><span class="pill" id="hg"></span><span class="pill" id="hp"></span><button class="g" id="hb" style="padding:6px 13px;background:rgba(14,17,22,.88)">Back to start</button></div>
+<div id="gp"><div id="gmap"></div><button id="gb" disabled>Place your pin</button></div>
+</div>
+
+<div id="result" class="screen"><div class="card">
+<h2 id="rh"></h2><div id="rmap"></div><div class="cols" id="rt"></div>
+<button id="next" style="display:none">Next</button><span id="rwait" class="m"></span>
+</div></div>
+
+<div id="final" class="screen"><div class="card">
+<h2>Final results</h2><div class="win" id="winner"></div><div class="cols" id="ft"></div>
+<button id="again" style="display:none">Play again</button><span id="fwait" class="m"></span>
+</div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* ====== CONFIG: fill these in ====== */
+const CFG={
+  maps:"AIzaSyClFqOdgZS1KxcM92VWNQyD6doonn3pHKQ",
+  fb:{apiKey:"AIzaSyBqImcUxoer_r3cGh7fk5TgnWVoUM7-Wc0",authDomain:"mygeogessr.firebaseapp.com",databaseURL:"https://mygeogessr-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"mygeogessr",appId:"1:903918711407:web:fe78b543db229dd387539a"}
+};
+/* =================================== */
+const ROUNDS=5,TIME=120,MAX=5,HP=5000,DMG=1; /* DMG = damage multiplier on the score gap */
+const TEAMS={A:{n:"Team Blue",c:"#4c9aff"},B:{n:"Team Coral",c:"#ff7a59"}};
+const SEEDS=[[48.86,2.35],[51.5,-0.12],[41.9,12.5],[40.4,-3.7],[52.5,13.4],[59.3,18.07],[52.2,21],[37.98,23.7],[41,28.97],[35.68,139.7],[34.7,135.5],[37.57,127],[13.75,100.5],[-6.2,106.8],[25.2,55.27],[-26.2,28],[-1.29,36.8],[-33.9,18.4],[-33.87,151.2],[-37.8,144.96],[-36.85,174.76],[40.7,-74],[41.88,-87.6],[34,-118.2],[19.4,-99.1],[4.7,-74.07],[-23.55,-46.6],[-34.6,-58.4],[-33.45,-70.67],[-12.05,-77.04],[43.65,-79.38],[49.28,-123.1],[64.15,-21.9],[59.9,10.75],[60.17,24.94],[1.35,103.8],[3.14,101.7],[25.03,121.5],[47.9,106.9],[41.7,44.8],[44.43,26.1],[38.7,-9.14],[53.35,-6.26]];
+const DARK=[{elementType:"geometry",stylers:[{color:"#1b2230"}]},{elementType:"labels.text.fill",stylers:[{color:"#8b949e"}]},{elementType:"labels.text.stroke",stylers:[{color:"#0e1116"}]},{featureType:"water",elementType:"geometry",stylers:[{color:"#0b1220"}]},{featureType:"road",elementType:"geometry",stylers:[{color:"#2a313c"}]},{featureType:"poi",stylers:[{visibility:"off"}]},{featureType:"transit",stylers:[{visibility:"off"}]},{featureType:"administrative.country",elementType:"geometry.stroke",stylers:[{color:"#6b7686"}]},{featureType:"administrative.province",elementType:"geometry.stroke",stylers:[{color:"#3d4654"}]},{featureType:"administrative.locality",elementType:"labels.text.fill",stylers:[{color:"#c3ccd8"}]}];
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const uid=sessionStorage.wid||(sessionStorage.wid=Math.random().toString(36).slice(2,10));
+let db,room,ref,S={},off=0,mapsReady=false,sv,pano,gmap,gmark,rmap,pending=null,guessed=false,curKey="",resKey="";
+const me={name:"",team:null,bot:null};
+/* Bot levels: [name, min km, max km] from the true location. Distance is random inside the window, bearing is random. */
+const BOT=[["Rookie",1000,40000],["Amateur",500,12000],["Intermediate",200,4000],["Advanced",100,2000],["Expert",50,1000]];
+function botGuess(t,lvl){
+  const w=BOT[lvl],d=w[1]+Math.random()*(w[2]-w[1]),th=Math.random()*2*Math.PI,R=6371,a=d/R,r=x=>x*Math.PI/180;
+  const p1=r(t.lat),l1=r(t.lng);
+  const p2=Math.asin(Math.sin(p1)*Math.cos(a)+Math.cos(p1)*Math.sin(a)*Math.cos(th));
+  const l2=l1+Math.atan2(Math.sin(th)*Math.sin(a)*Math.cos(p1),Math.cos(a)-Math.sin(p1)*Math.sin(p2));
+  return {lat:p2*180/Math.PI,lng:((l2*180/Math.PI+540)%360)-180};
+}
+function putBot(){
+  const r=ref.child("players/bot");r.onDisconnect().remove();
+  r.set({name:"Bot · "+BOT[me.bot.lvl][0],team:"B",t:9e14,lvl:me.bot.lvl});
+}
+function scheduleBot(key){
+  if(!me.bot||!isHost())return;
+  setTimeout(()=>{
+    const g=S.game;if(!g||g.status!=="play"||g.id+"-"+g.round!==key||gs(g.round,"bot"))return;
+    const t=g.locs[g.round],q=botGuess(t,me.bot.lvl),d=km(q,t);
+    ref.child("guesses/"+g.round+"/bot").set({lat:q.lat,lng:q.lng,d,s:score(d)});
+  },4000+Math.random()*10000);
+}
+
+window.initMaps=()=>{mapsReady=true;sv=new google.maps.StreetViewService();render();};
+(function(){const s=document.createElement("script");s.src="https://maps.googleapis.com/maps/api/js?key="+CFG.maps+"&callback=initMaps";document.head.appendChild(s);})();
+firebase.initializeApp(CFG.fb);db=firebase.database();
+db.ref(".info/serverTimeOffset").on("value",s=>off=s.val()||0);
+db.ref(".info/connected").on("value",s=>{if(s.val()&&ref){putMe();}});
+
+function putMe(){const r=ref.child("players/"+uid);r.onDisconnect().remove();r.set({name:me.name,team:me.team,t:firebase.database.ServerValue.TIMESTAMP});if(me.bot)putBot();}
+function show(id){["join","lobby","game","result","final"].forEach(x=>$(x).classList.toggle("on",x===id));}
+function players(){return Object.entries(S.players||{}).map(([id,p])=>({id,...p})).sort((a,b)=>((a.t||1e15)-(b.t||1e15))||(a.id<b.id?-1:1));}
+const isHost=()=>(players()[0]||{}).id===uid;
+const gs=(r,id)=>(S.guesses&&S.guesses[r]&&S.guesses[r][id])||null;
+function teamRound(t,r){return Math.max(0,...players().filter(p=>p.team===t).map(p=>(gs(r,p.id)||{}).s||0));}
+const other=t=>t==="A"?"B":"A";
+/* Duel style: only the team with the worse closest pin loses health, equal to the score gap. */
+function dmg(t,r){return Math.max(0,Math.round(DMG*(teamRound(other(t),r)-teamRound(t,r))));}
+function hp(t,upto){let h=HP;for(let r=0;r<=upto;r++)h-=dmg(t,r);return Math.max(0,h);}
+const over=r=>r>=ROUNDS-1||hp("A",r)<=0||hp("B",r)<=0;
+function km(a,b){const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dg=r(b.lng-a.lng);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+/* GeoGuessr world-map scoring: 5000 * e^(-10 * d / 14916.862), d in km */
+const score=d=>d<0.025?5000:Math.round(5000*Math.exp(-10*d/14916.862));
+const fd=d=>d<1?Math.round(d*1000)+" m":Math.round(d).toLocaleString()+" km";
+const fs=n=>Math.round(n).toLocaleString();
+let animKey="",cfKey="";
+function count(el,a,b,ms){const t0=performance.now();(function f(t){const k=Math.min(1,(t-t0)/ms);el.textContent=fs(a+(b-a)*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(f);})(t0);}
+function confetti(){for(let i=0;i<60;i++){const d=document.createElement("div");d.className="cf";d.style.left=Math.random()*100+"vw";d.style.background=["#3fb68b","#4c9aff","#ff7a59","#ffd166","#e6edf3"][i%5];d.style.animationDelay=Math.random()*.8+"s";d.style.animationDuration=2+Math.random()*1.5+"s";document.body.appendChild(d);setTimeout(()=>d.remove(),4500);}}
+
+$("enter").onclick=()=>{
+  const n=$("nm").value.trim(),c=$("rc").value.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(!n||!c){$("err").textContent="Enter a username and a room code.";return;}
+  if(!CFG.fb.databaseURL){$("err").textContent="Firebase isn't configured yet (see CFG in index.html).";return;}
+  joinRoom(n,c,null);
+};
+function joinRoom(n,c,bot){
+  me.name=n;me.bot=bot;room=c;ref=db.ref("rooms/"+c);$("code").textContent=bot?"Bot match":c;
+  putMe();ref.on("value",s=>{S=s.val()||{};render();});show("lobby");
+}
+$("botgo").onclick=()=>{
+  const n=$("nm").value.trim();
+  if(!n){$("err").textContent="Enter a username first.";return;}
+  if(!CFG.fb.databaseURL){$("err").textContent="Firebase isn't configured yet (see CFG in index.html).";return;}
+  if(!mapsReady){$("err").textContent="Maps is still loading. Try again in a moment.";return;}
+  me.team="A";
+  joinRoom(n,"bot"+Math.random().toString(36).slice(2,8),{lvl:+$("lvl").value});
+  startGame();
+};
+function setTeam(t){
+  if(players().filter(p=>p.team===t).length>=MAX)return;
+  me.team=t;ref.child("players/"+uid+"/team").set(t);
+}
+
+function render(){
+  if(!ref)return;
+  const g=S.game||{status:"lobby"},P=players();
+  if(g.status==="lobby"||!me.team)return lobbyView(g,P);
+  if(g.status==="play")return playView(g,P);
+  if(g.status==="result")return resultView(g,P);
+  if(g.status==="final")return finalView(g,P);
+}
+
+function lobbyView(g,P){
+  show("lobby");const live=g.status==="lobby";
+  $("lnote").textContent=live?"Pick a team. Up to 5 per team; a team can be just one player (1v1). The first person in the room is the host. Each team starts with 5,000 health. Each round the team with the worse closest pin loses the score gap. Lowest health after 5 rounds loses, and 0 ends it early.":"A game is in progress. Wait for the next one.";
+  $("teams").innerHTML=["A","B"].map(t=>{
+    const m=P.filter(p=>p.team===t);
+    return `<div class="col"><h3 style="color:${TEAMS[t].c}">${TEAMS[t].n} <span class="m">${m.length}/${MAX}</span></h3>`+
+      m.map(p=>`<div class="row"><span>${esc(p.name)}${p.id===P[0].id?' <span class="m">(host)</span>':""}</span></div>`).join("")+
+      `<button class="g" style="margin-top:10px;width:100%" onclick="setTeam('${t}')" ${(!live||me.team===t||m.length>=MAX)?"disabled":""}>${me.team===t?"You're here":"Join"}</button></div>`;
+  }).join("");
+  const idle=P.filter(p=>!p.team);
+  $("idle").textContent=idle.length?"Choosing: "+idle.map(p=>p.name).join(", "):"";
+  const ok=P.filter(p=>p.team==="A").length>0&&P.filter(p=>p.team==="B").length>0;
+  $("start").style.display=isHost()&&live?"":"none";
+  $("start").disabled=!(ok&&mapsReady);
+  $("swait").textContent=isHost()?(ok?"":"Each team needs at least one player."):"Waiting for the host to start.";
+}
+async function startGame(){
+  $("start").disabled=true;$("swait").textContent="Finding locations…";
+  const locs=[],pool=SEEDS.slice().sort(()=>Math.random()-.5);
+  for(const s of pool){
+    if(locs.length>=ROUNDS)break;
+    try{
+      const r=await sv.getPanorama({location:{lat:s[0]+(Math.random()-.5)*1.2,lng:s[1]+(Math.random()-.5)*1.2},radius:100000,preference:google.maps.StreetViewPreference.NEAREST,sources:[google.maps.StreetViewSource.GOOGLE]});
+      if(!r.data.links||!r.data.links.length||!/Google/i.test(r.data.copyright||""))continue;const l=r.data.location;locs.push({p:l.pano,lat:l.latLng.lat(),lng:l.latLng.lng()});
+    }catch(e){}
+  }
+  if(locs.length<ROUNDS){$("swait").textContent="Couldn't load Street View. Check your Maps API key.";$("start").disabled=false;return;}
+  await ref.child("guesses").remove();
+  ref.child("game").set({id:Math.random().toString(36).slice(2),status:"play",round:0,locs,start:firebase.database.ServerValue.TIMESTAMP});
+}
+$("start").onclick=startGame;
+
+function playView(g,P){
+  show("game");
+  const key=g.id+"-"+g.round,loc=g.locs[g.round];
+  if(key!==curKey){
+    curKey=key;guessed=false;pending=null;scheduleBot(key);
+    if(gmark){gmark.setMap(null);gmark=null;}
+    if(!pano)pano=new google.maps.StreetViewPanorama($("pano"),{pano:loc.p,addressControl:false,showRoadLabels:false,fullscreenControl:false,enableCloseButton:false,motionTracking:false,motionTrackingControl:false,zoomControl:true,linksControl:true,clickToGo:true,panControl:true,scrollwheel:true});
+    else{pano.setPano(loc.p);pano.setPov({heading:Math.random()*360,pitch:0});}
+    if(!gmap){
+      gmap=new google.maps.Map($("gmap"),{center:{lat:20,lng:0},zoom:1,minZoom:1,maxZoom:19,disableDefaultUI:true,zoomControl:true,clickableIcons:false,styles:DARK,gestureHandling:"greedy"});
+      gmap.addListener("click",e=>{if(guessed)return;pending={lat:e.latLng.lat(),lng:e.latLng.lng()};
+        if(!gmark)gmark=new google.maps.Marker({map:gmap,position:e.latLng,animation:google.maps.Animation.DROP});else gmark.setPosition(e.latLng);
+        $("gb").disabled=false;$("gb").textContent="Guess";});
+      $("gp").onclick=e=>{if(e.target.tagName!=="BUTTON")$("gp").classList.add("big");};
+      $("gp").addEventListener("transitionend",()=>google.maps.event.trigger(gmap,"resize"));
+    }
+    gmap.setCenter({lat:20,lng:0});gmap.setZoom(1);$("gp").classList.remove("big");
+    $("gb").disabled=true;$("gb").textContent="Place your pin";
+  }
+  $("hr").textContent="Round "+(g.round+1)+" / "+ROUNDS;
+  const T=P.filter(p=>p.team),done=T.filter(p=>gs(g.round,p.id)).length;
+  $("hg").textContent="Guessed "+done+" / "+T.length;
+  $("hp").textContent=TEAMS.A.n.split(" ")[1]+" "+fs(hp("A",g.round-1))+" · "+TEAMS.B.n.split(" ")[1]+" "+fs(hp("B",g.round-1));
+  if(isHost()&&T.length&&done===T.length)ref.child("game/status").set("result");
+}
+function submit(){
+  if(guessed||!pending)return;guessed=true;
+  const g=S.game,t=g.locs[g.round],d=km(pending,t);
+  ref.child("guesses/"+g.round+"/"+uid).set({lat:pending.lat,lng:pending.lng,d,s:score(d)});
+  $("gb").disabled=true;$("gb").textContent="Locked in";
+}
+$("gb").onclick=submit;
+$("hb").onclick=()=>{const g=S.game;if(pano&&g&&g.locs)pano.setPano(g.locs[g.round].p);};
+setInterval(()=>{
+  const g=S.game;if(!g||g.status!=="play"||!g.start)return;
+  const left=Math.max(0,Math.ceil(TIME-(Date.now()+off-g.start)/1000));
+  $("ht").textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");$("ht").classList.toggle("low",left<=10);
+  if(left<=0){if(!guessed&&pending)submit();if(isHost())ref.child("game/status").set("result");}
+},500);
+
+function dot(map,pos,color,size,title){return new google.maps.Marker({map,position:pos,title,animation:google.maps.Animation.DROP,icon:{path:google.maps.SymbolPath.CIRCLE,scale:size,fillColor:color,fillOpacity:1,strokeColor:"#fff",strokeWeight:2}});}
+function resultView(g,P){
+  show("result");const r=g.round,t=g.locs[r],T=P.filter(p=>p.team);
+  $("rh").textContent="Round "+(r+1)+" of "+ROUNDS+(over(r)&&r<ROUNDS-1?" · Knockout":"");
+  const first=animKey!==g.id+"-"+r;animKey=g.id+"-"+r;const w0=x=>(first?hp(x,r-1):hp(x,r))/50;
+  const k=g.id+r+Object.keys((S.guesses||{})[r]||{}).length;
+  if(k!==resKey){
+    resKey=k;
+    rmap=new google.maps.Map($("rmap"),{center:{lat:t.lat,lng:t.lng},zoom:3,disableDefaultUI:true,styles:DARK,gestureHandling:"greedy"});
+    const bnd=new google.maps.LatLngBounds({lat:t.lat,lng:t.lng});
+    dot(rmap,{lat:t.lat,lng:t.lng},"#3fb68b",10,"Actual location");
+    const best={A:teamRound("A",r),B:teamRound("B",r)};
+    T.forEach(p=>{const q=gs(r,p.id);if(!q)return;const c=TEAMS[p.team].c,top=q.s===best[p.team];
+      dot(rmap,{lat:q.lat,lng:q.lng},c,top?9:5,p.name);bnd.extend({lat:q.lat,lng:q.lng});
+      new google.maps.Polyline({map:rmap,path:[{lat:q.lat,lng:q.lng},{lat:t.lat,lng:t.lng}],strokeColor:c,strokeOpacity:top?.95:.3,strokeWeight:top?3:1.5});});
+    rmap.fitBounds(bnd,50);
+  }
+  $("rt").innerHTML=["A","B"].map(x=>{
+    const m=T.filter(p=>p.team===x);
+    return `<div class="col${first&&dmg(x,r)?" hit":""}"><div class="dmg">${dmg(x,r)?"−"+fs(dmg(x,r)):""}</div><h3 style="color:${TEAMS[x].c}">${TEAMS[x].n}</h3><div class="bar"><i class="gh" style="width:${w0(x)}%" data-w="${hp(x,r)/50}"></i><i style="width:${w0(x)}%;background:${hp(x,r)<=1500?"#ff5d5d":TEAMS[x].c}" data-w="${hp(x,r)/50}"></i></div><div class="row"><span>Round score (closest pin)</span><b class="cn" data-a="0" data-b="${teamRound(x,r)}">${fs(teamRound(x,r))}</b></div><div class="row"><span>Damage taken</span><b>${dmg(x,r)?"−":""}<span class="cn" data-a="0" data-b="${dmg(x,r)}">${fs(dmg(x,r))}</span></b></div><div class="row"><span>Health</span><b><span class="cn" data-a="${hp(x,r-1)}" data-b="${hp(x,r)}">${fs(first?hp(x,r-1):hp(x,r))}</span> / ${fs(HP)}</b></div>`+
+    m.map(p=>{const q=gs(r,p.id);return `<div class="row m"><span>${esc(p.name)}</span><span>${q?(q.s===teamRound(x,r)?"★ ":"")+fs(q.s)+" · "+fd(q.d):"no guess"}</span></div>`;}).join("")+`</div>`;
+  }).join("");
+  if(first){
+    document.querySelectorAll("#rt .cn").forEach(e=>count(e,+e.dataset.a,+e.dataset.b,1300));
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      document.querySelectorAll("#rt .bar i").forEach(i=>i.style.width=i.dataset.w+"%");
+      document.querySelectorAll("#rt .dmg").forEach(d=>{if(d.textContent)d.classList.add("go");});
+    }));
+  }
+  $("next").style.display=isHost()?"":"none";$("rwait").textContent=isHost()?"":"Waiting for the host…";
+  $("next").textContent=over(r)?"See final results":"Next round";
+}
+$("next").onclick=()=>{
+  const g=S.game;
+  if(!over(g.round))ref.child("game").update({round:g.round+1,status:"play",start:firebase.database.ServerValue.TIMESTAMP});
+  else ref.child("game/status").set("final");
+};
+
+function finalView(g,P){
+  show("final");const T=P.filter(p=>p.team),a=hp("A",g.round),b=hp("B",g.round);
+  $("winner").textContent=a===b?"It's a draw":(a>b?TEAMS.A.n:TEAMS.B.n)+" wins"+(Math.min(a,b)===0?" by knockout":"");
+  if(cfKey!==g.id){cfKey=g.id;$("winner").classList.remove("pop");void $("winner").offsetWidth;$("winner").classList.add("pop");if(a!==b)confetti();}
+  $("ft").innerHTML=["A","B"].map((x,i)=>{
+    const m=T.filter(p=>p.team===x).map(p=>({p,s:[...Array(ROUNDS).keys()].reduce((n,r)=>n+((gs(r,p.id)||{}).s||0),0)})).sort((u,v)=>v.s-u.s);
+    return `<div class="col"><h3 style="color:${TEAMS[x].c}">${TEAMS[x].n}</h3><div class="row"><span>Final health</span><b>${fs(i?b:a)} / ${fs(HP)}</b></div>`+
+    m.map(o=>`<div class="row m"><span>${esc(o.p.name)}</span><span>${fs(o.s)}</span></div>`).join("")+`</div>`;
+  }).join("");
+  $("again").style.display=isHost()?"":"none";$("fwait").textContent=isHost()?"":"Waiting for the host…";
+}
+$("again").onclick=async()=>{await ref.child("guesses").remove();ref.child("game").set({status:"lobby"});};
+</script>
+</body></html>
